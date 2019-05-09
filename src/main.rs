@@ -20,7 +20,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn handler(e: ApiGatewayProxyRequest, _c: Context) -> Result<Kennel, HandlerError> {
     println!("{:?}", e);
-//    let val = get_kennel("PUGET_SOUND".to_string()).unwrap();
+    getAndDeserialize()
+}
+
+fn getAndDeserialize() -> Result<Kennel, HandlerError> {
     match get_kennel("PUGET_SOUND".to_string()) {
         Ok(val) => {
             let k: Kennel = serde_json::from_str(val.as_str())?;
@@ -29,7 +32,6 @@ fn handler(e: ApiGatewayProxyRequest, _c: Context) -> Result<Kennel, HandlerErro
         Err(e) => {
             panic!(e)
         }
-
     }
 }
 
