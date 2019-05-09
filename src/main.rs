@@ -1,42 +1,36 @@
+extern crate aws_lambda_events;
+extern crate lambda_runtime;
 extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 extern crate serde;
-extern crate lambda_runtime;
-//extern crate simple_logger;
 
 use std::collections::HashMap;
+use std::error::Error;
 
+use aws_lambda_events::event::apigw::ApiGatewayProxyRequest;
+use lambda_runtime::{Context, error::HandlerError, lambda};
 use rusoto_core::Region;
 use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, GetItemInput};
-use serde::{Serialize,Deserialize};
-
-use std::error::Error;
-use lambda_runtime::{error::HandlerError, lambda, Context};
-
-//use log::{self, error};
-//use simple_error::bail;
-//use simple_logger;
+use serde::{Deserialize, Serialize};
 
 fn main() -> Result<(), Box<dyn Error>> {
-//    simple_logger::init_with_level(log::Level::Debug)?;
     lambda!(handler);
     Ok(())
 }
 
-fn handler(e: String, c: Context) -> Result<Kennel, HandlerError> {
-    println!("{}",e);
+fn handler(e: ApiGatewayProxyRequest, _c: Context) -> Result<Kennel, HandlerError> {
+    println!("{:?}", e);
+//    let val = get_kennel("PUGET_SOUND".to_string()).unwrap();
     match get_kennel("PUGET_SOUND".to_string()) {
         Ok(val) => {
-            let k: Kennel = serde_json::from_str(val.as_str()).unwrap();
-            println!("{:#?}", k);
-            println!("{}", val);
+            let k: Kennel = serde_json::from_str(val.as_str())?;
             Ok(k)
         }
         Err(e) => {
-            Err(c.new_error(e.as_str()))
+            panic!(e)
         }
-    }
 
+    }
 }
 
 fn get_kennel(kennel_id: String) -> Result<String, String> {
@@ -93,16 +87,16 @@ fn test() {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Kennel {
-    id : String,
-    name:String,
-    description:String,
+    id: String,
+    name: String,
+    description: String,
     #[serde(rename(serialize = "hareraiserName", deserialize = "hareraiserName"))]
-    hareraiser_name:String,
+    hareraiser_name: String,
     #[serde(rename(serialize = "hareraiserEmail", deserialize = "hareraiserEmail"))]
-    hareraiser_email:String,
-    badges:Vec<String>,
+    hareraiser_email: String,
+    badges: Vec<String>,
     #[serde(rename(serialize = "firstHash", deserialize = "firstHash"))]
-    first_hash:String,
-    founders:String,
-    lineage:String,
+    first_hash: String,
+    founders: String,
+    lineage: String,
 }
