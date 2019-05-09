@@ -50,20 +50,13 @@ fn get_kennel(kennel_id: String) -> Result<String, String> {
             return Err(val);
         }
     };
-    let attribute_map = match result.item {
-        Some(attribute_map) => attribute_map,
-        None => return Err("query returned no result".to_string()),
+    let attribute_map = result.item.ok_or("query returned no result".to_string())?;
+    let payload = attribute_map.get("payload").ok_or("no payload found".to_string())?;
+    let string_payload = match &payload.s {
+        Some(string_payload) => string_payload,
+        None => return Err("payload is not a string".to_string()),
     };
-    let payload = match attribute_map.get("payload") {
-        Some(payload) => payload,
-        None => return Err("no payload found".to_string()),
-    };
-    match &payload.s {
-        Some(string_payload) => {
-            Ok(string_payload.to_string())
-        }
-        None => Err("payload is not a string".to_string())
-    }
+    Ok(string_payload.to_string())
 }
 
 #[test]
