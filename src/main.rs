@@ -4,14 +4,13 @@ extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 extern crate serde;
 
-use std::collections::HashMap;
-use std::error::Error;
-
 use aws_lambda_events::event::apigw::ApiGatewayProxyRequest;
 use lambda_runtime::{Context, error::HandlerError, lambda};
 use rusoto_core::Region;
 use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, GetItemInput};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     lambda!(handler);
@@ -20,19 +19,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn handler(e: ApiGatewayProxyRequest, _c: Context) -> Result<Kennel, HandlerError> {
     println!("{:?}", e);
-    getAndDeserialize()
+    get_and_deserialize()
 }
 
-fn getAndDeserialize() -> Result<Kennel, HandlerError> {
-    match get_kennel("PUGET_SOUND".to_string()) {
-        Ok(val) => {
-            let k: Kennel = serde_json::from_str(val.as_str())?;
-            Ok(k)
-        }
-        Err(e) => {
-            panic!(e)
-        }
-    }
+fn get_and_deserialize() -> Result<Kennel, HandlerError> {
+    let val = match get_kennel("PUGET_SOUND".to_string()) {
+        Ok(val) => val,
+        Err(e) => panic!(e),
+    };
+    let k: Kennel = serde_json::from_str(val.as_str())?;
+    Ok(k)
 }
 
 fn get_kennel(kennel_id: String) -> Result<String, String> {
@@ -47,29 +43,26 @@ fn get_kennel(kennel_id: String) -> Result<String, String> {
         ..Default::default()
     };
     let client = DynamoDbClient::new(Region::UsWest2);
-    match client.get_item(query).sync() {
-        Ok(result) => {
-            match result.item {
-                Some(attribute_map) => {
-                    match attribute_map.get("payload") {
-                        Some(payload) => {
-                            match &payload.s {
-                                Some(string_payload) => {
-                                    Ok(string_payload.to_string())
-                                }
-                                None => Err("payload is not a string".to_string())
-                            }
-                        }
-                        None => Err("no payload found".to_string())
-                    }
-                }
-                None => Err("query returned no result".to_string())
-            }
-        }
+    let result = match client.get_item(query).sync() {
+        Ok(result) => result,
         Err(err) => {
             let val = format!("failure to get kennels: {:?}", err);
-            Err(val)
+            return Err(val);
         }
+    };
+    let attribute_map = match result.item {
+        Some(attribute_map) => attribute_map,
+        None => return Err("query returned no result".to_string()),
+    };
+    let payload = match attribute_map.get("payload") {
+        Some(payload) => payload,
+        None => return Err("no payload found".to_string()),
+    };
+    match &payload.s {
+        Some(string_payload) => {
+            Ok(string_payload.to_string())
+        }
+        None => Err("payload is not a string".to_string())
     }
 }
 
@@ -101,4 +94,10 @@ struct Kennel {
     first_hash: String,
     founders: String,
     lineage: String,
+}
+
+
+#[test]
+fn test_err() {
+//    HandlerError::from("an str".to_string())
 }
