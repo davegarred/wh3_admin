@@ -9,7 +9,8 @@ const KENNEL_ID_KEY: &str = "kennel_id";
 const KENNEL_TABLE_KEY: &str = "wh3_kennel";
 
 pub trait Persister {
-    fn get_kennel(&self, String) -> Result<String, String>;
+    fn get_kennel(&self, kennel_id: String) -> Result<String, String>;
+    fn put_kennel(&self, kennel_id: String, kennel_serialization: String) -> Result<(), String>;
 }
 
 pub struct Dynamo;
@@ -40,8 +41,11 @@ impl Persister for Dynamo {
             Some(string_payload) => string_payload,
             None => return Err("payload is not a string".to_string()),
         };
-//        let k: Kennel = serde_json::from_str(string_payload.as_str()).unwrap();
         Ok(string_payload.clone())
+    }
+
+    fn put_kennel(&self, _kennel_id: String, _kennel_serialization: String) -> Result<(), String> {
+        Ok(())
     }
 }
 
@@ -50,8 +54,10 @@ pub struct TestDb;
 impl Persister for TestDb {
     fn get_kennel(&self, _: String) -> Result<String, String> {
         let ser = fs::read_to_string(String::from("res/json/puget_sound.json")).unwrap();
-//        let k: Kennel = serde_json::from_str(ser.as_str()).unwrap();
         Ok(ser)
+    }
+    fn put_kennel(&self, _kennel_id: String, _kennel_serialization: String) -> Result<(), String> {
+        Ok(())
     }
 }
 
