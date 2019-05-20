@@ -1,34 +1,51 @@
-use std::collections::hash_map::HashMap;
+use std::collections::hash_map::{HashMap};
+use std::error::Error;
 use std::fs;
 use std::string::ToString;
 
 use rusoto_core::Region;
-use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, GetItemInput};
+use rusoto_dynamodb::{AttributeValue, DynamoDb, DynamoDbClient, GetItemInput, PutItemInput};
 
-const KENNEL_ID_KEY: &str = "kennel_id";
-const KENNEL_TABLE_KEY: &str = "wh3_kennel";
+use dto::Kennel;
+
+const KENNEL_ID_FIELD: &str = "kennel_id";
+const PAYLOAD_FIELD: &str = "payload";
+const KENNEL_TABLE: &str = "wh3_kennel";
 
 pub trait Persister {
-    fn get_kennel(&self, kennel_id: String) -> Result<String, String>;
-    fn put_kennel(&self, kennel_id: String, kennel_serialization: String) -> Result<(), String>;
+    fn get_kennel(&self, kennel_id: &String) -> Result<String, String>;
+    fn put_kennel(&self, kennel_id: &String, kennel_serialization: String) -> Result<(), String>;
 }
 
-pub struct Dynamo;
+pub struct Dynamo{
+    client: DynamoDbClient,
+}
+
+impl Dynamo {
+    pub fn new() -> Dynamo {
+        Dynamo{ client: DynamoDbClient::new(Region::UsWest2) }
+    }
+    fn string_attribute_value(value: &String) -> AttributeValue {
+        AttributeValue {
+            s: Some(value.clone()),
+            ..Default::default()
+        }
+    }
+}
+
 
 impl Persister for Dynamo {
-    fn get_kennel(&self, kennel_id: String) -> Result<String, String> {
-        let mut query_key = HashMap::<String, AttributeValue>::new();
-        query_key.insert(String::from(KENNEL_ID_KEY), AttributeValue {
-            s: Some(kennel_id),
-            ..Default::default()
-        });
+    fn get_kennel(&self, kennel_id: &String) -> Result<String, String> {
+        let mut key = HashMap::<String, AttributeValue>::new();
+        key.insert(String::from(KENNEL_ID_FIELD), Dynamo::string_attribute_value(&kennel_id));
+
         let query = GetItemInput {
-            key: query_key,
-            table_name: String::from(KENNEL_TABLE_KEY),
+            key,
+            table_name: String::from(KENNEL_TABLE),
             ..Default::default()
         };
-        let client = DynamoDbClient::new(Region::UsWest2);
-        let result = match client.get_item(query).sync() {
+//        let client = DynamoDbClient::new(Region::UsWest2);
+        let result = match self.client.get_item(query).sync() {
             Ok(result) => result,
             Err(err) => {
                 let val = format!("failure to get kennels: {:?}", err);
@@ -44,19 +61,40 @@ impl Persister for Dynamo {
         Ok(string_payload.clone())
     }
 
-    fn put_kennel(&self, _kennel_id: String, _kennel_serialization: String) -> Result<(), String> {
-        Ok(())
+    fn put_kennel(&self, kennel_id: &String, kennel_serialization: String) -> Result<(), String> {
+        validate(&kennel_serialization)?;
+        let mut item: HashMap<String, AttributeValue> = HashMap::new();
+        item.insert(String::from(KENNEL_ID_FIELD), Dynamo::string_attribute_value(&kennel_id));
+        item.insert(String::from(PAYLOAD_FIELD), Dynamo::string_attribute_value(&kennel_serialization));
+        let query = PutItemInput {
+            item,
+            table_name: String::from(KENNEL_TABLE),
+            ..Default::default()
+        };
+        match self.client.put_item(query).sync() {
+            Ok(_) => Ok(()),
+            Err(e) => Err(String::from(e.description())),
+        }
     }
 }
 
-pub struct TestDb;
+
+fn validate(kennel_serialization: &String) -> Result<(), String> {
+    let _kennel: Kennel = match serde_json::from_str(kennel_serialization.as_ref()) {
+        Ok(kennel) => kennel,
+        Err(e) => return Err(String::from(e.description())),
+    };
+    Ok(())
+}
+
+struct TestDb;
 
 impl Persister for TestDb {
-    fn get_kennel(&self, _: String) -> Result<String, String> {
+    fn get_kennel(&self, _: &String) -> Result<String, String> {
         let ser = fs::read_to_string(String::from("res/json/puget_sound.json")).unwrap();
         Ok(ser)
     }
-    fn put_kennel(&self, _kennel_id: String, _kennel_serialization: String) -> Result<(), String> {
+    fn put_kennel(&self, _kennel_id: &String, _kennel_serialization: String) -> Result<(), String> {
         Ok(())
     }
 }
@@ -64,13 +102,15 @@ impl Persister for TestDb {
 #[test]
 fn test_dynamo() {
     let db = TestDb {};
-//    let db = persist::Dynamo{};
-    match db.get_kennel(String::from("PUGET_SOUND")) {
-        Ok(val) => {
-            println!("{:#?}", val);
-        }
-        Err(e) => {
-            panic!(e)
-        }
-    }
+//    let db = Dynamo::new();
+    let puget_sound = String::from("PUGET_SOUND");
+
+
+    let ser = fs::read_to_string(String::from("res/json/puget_sound.json")).unwrap();
+    db.put_kennel(&puget_sound, ser).unwrap();
+
+    let kennel_str = db.get_kennel(&puget_sound).unwrap();
+    println!("{:#?}", kennel_str);
+
 }
+

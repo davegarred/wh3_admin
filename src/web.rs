@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use aws_lambda_events::event::apigw::{ApiGatewayProxyRequest, ApiGatewayProxyResponse};
+use aws_lambda_events::event::apigw::{ApiGatewayProxyResponse};
 
 pub fn error_result(error: String, status: i64) -> ApiGatewayProxyResponse {
     ApiGatewayProxyResponse {

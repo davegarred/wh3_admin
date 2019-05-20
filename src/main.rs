@@ -21,8 +21,6 @@ const POST: &str = "POST";
 const GET: &str = "GET";
 const REQUEST_PARAMETER: &str = "proxy";
 
-static DB: Dynamo = persist::Dynamo {};
-
 fn main() -> Result<(), Box<dyn Error>> {
     lambda!(handler);
     Ok(())
@@ -36,26 +34,28 @@ fn handler(req: ApiGatewayProxyRequest, _c: Context) -> Result<ApiGatewayProxyRe
     match req.http_method.unwrap().as_ref() {
         POST => {
             match req.body {
-                Some(body) => Ok(put_kennel(kennel_id, body)),
+                Some(body) => Ok(put_kennel(&kennel_id, body)),
                 None => Ok(web::error_result(String::from("no body"), 400)),
             }
         }
         GET => {
-            Ok(get_kennel(kennel_id))
+            Ok(get_kennel(&kennel_id))
         }
-        _ => return Ok(web::error_result(String::from("method not allowed"), 405)),
+        _ => Ok(web::error_result(String::from("method not allowed"), 405)),
     }
 }
 
-fn get_kennel(kennel_id: String) -> ApiGatewayProxyResponse {
-    match DB.get_kennel(kennel_id) {
+fn get_kennel(kennel_id: &String) -> ApiGatewayProxyResponse {
+    let db = Dynamo::new();
+    match db.get_kennel(kennel_id) {
         Ok(val) => web::success(Some(val)),
         Err(e) => web::error_result(e, 500),
     }
 }
 
-fn put_kennel(kennel_id: String, kennel_serialization: String) -> ApiGatewayProxyResponse {
-    match DB.put_kennel(kennel_id, kennel_serialization) {
+fn put_kennel(kennel_id: &String, kennel_serialization: String) -> ApiGatewayProxyResponse {
+    let db = Dynamo::new();
+    match db.put_kennel(kennel_id, kennel_serialization) {
         Ok(_) => web::success(Some(String::new())),
         Err(e) => web::error_result(e, 500),
     }
