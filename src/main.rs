@@ -6,12 +6,11 @@ extern crate rusoto_core;
 extern crate rusoto_dynamodb;
 extern crate serde;
 
-use std::error::Error;
-
 use aws_lambda_events::event::apigw::{ApiGatewayProxyRequest, ApiGatewayProxyResponse};
 use lambda_runtime::{Context, error::HandlerError, lambda};
-
+use lambda_runtime::Handler;
 use persist::*;
+use std::error::Error;
 
 mod persist;
 mod dto;
@@ -21,27 +20,33 @@ const POST: &str = "POST";
 const GET: &str = "GET";
 const REQUEST_PARAMETER: &str = "proxy";
 
+struct App {}
+
+
 fn main() -> Result<(), Box<dyn Error>> {
-    lambda!(handler);
+    let app = App {};
+    lambda!(app);
     Ok(())
 }
 
-fn handler(req: ApiGatewayProxyRequest, _c: Context) -> Result<ApiGatewayProxyResponse, HandlerError> {
-    let kennel_id = match req.path_parameters.get(REQUEST_PARAMETER) {
-        Some(kennel_id) => kennel_id.clone(),
-        None => return Ok(web::error_result(String::from("requires kennel id"), 400)),
-    };
-    match req.http_method.unwrap().as_ref() {
-        POST => {
-            match req.body {
-                Some(body) => Ok(put_kennel(&kennel_id, body)),
-                None => Ok(web::error_result(String::from("no body"), 400)),
+impl Handler<ApiGatewayProxyRequest, ApiGatewayProxyResponse, HandlerError> for App {
+    fn run(&mut self, req: ApiGatewayProxyRequest, _ctx: Context) -> Result<ApiGatewayProxyResponse, HandlerError> {
+        let kennel_id = match req.path_parameters.get(REQUEST_PARAMETER) {
+            Some(kennel_id) => kennel_id.clone(),
+            None => return Ok(web::error_result(String::from("requires kennel id"), 400)),
+        };
+        match req.http_method.unwrap().as_ref() {
+            POST => {
+                match req.body {
+                    Some(body) => Ok(put_kennel(&kennel_id, body)),
+                    None => Ok(web::error_result(String::from("no body"), 400)),
+                }
             }
+            GET => {
+                Ok(get_kennel(&kennel_id))
+            }
+            _ => Ok(web::error_result(String::from("method not allowed"), 405)),
         }
-        GET => {
-            Ok(get_kennel(&kennel_id))
-        }
-        _ => Ok(web::error_result(String::from("method not allowed"), 405)),
     }
 }
 
